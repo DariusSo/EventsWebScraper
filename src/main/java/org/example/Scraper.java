@@ -6,6 +6,7 @@ import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
+import java.sql.SQLException;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -25,20 +26,13 @@ public class Scraper {
     public void test() throws InterruptedException {
 
        init();
-       List<WebElement> categoryList = driver.findElements(By.xpath("/html/body/div[2]/div[1]/div/header/div[2]/div/nav/ul/li"));
-        System.out.println(categoryList.size());
-       for(int i = 1; i < categoryList.size(); i++){
+       for(int i = 1; i < 8; i++){
            WebElement webElement = driver.findElement(By.xpath("/html/body/div[2]/div[1]/div/header/div[2]/div/nav/ul/li[" + i + "]/a"));
            category = webElement.getText();
-           webElement.click();
-           //popUpHandle();
-           boolean rekomenduojama = false;
-           try{
-               driver.findElement(By.xpath("/html/body/div[2]/section/div/div[2]/div[1]/div[1]/h2"));
-               rekomenduojama = true;
-           }catch (Exception e){
+           System.out.println("Going to " + category);
 
-           }
+           webElement.click();
+
            if(category.equals("Koncertai") || category.equals("Teatras")){
                goThroughElements("/html/body/div[2]/section/div/div[2]/div[1]/div[2]");
                driver.findElement(By.xpath("/html/body/div[2]/div[1]/div/header/div[2]/div/nav/ul/li[" + i + "]/a")).click();
@@ -46,13 +40,6 @@ public class Scraper {
            }else{
                goThroughElements("/html/body/div[2]/section/div/div[2]/div/div[1]/div");
            }
-//           try{
-//               driver.findElement(By.xpath("/html/body/div[1]/div/div/div/div[1]/button")).click();
-//           }catch (Exception e){
-//
-//           }
-           //driver.navigate().back();
-           //driver.navigate().to(home);
        }
     }
 
@@ -66,16 +53,13 @@ public class Scraper {
                 try{
                     createEvent();
                 }catch (Exception e){
+                    e.printStackTrace();
                     System.out.println("Tickets sold out or event canceled.");
                 }
                 driver.navigate().back();
 
-            }catch (NoSuchWindowException e){
-                e.printStackTrace();
-                System.exit(0);
             }catch (Exception e){
-                System.out.println("Viskas");
-                e.printStackTrace();
+                System.out.println("Going to other category");
                 driver.navigate().back();
                 flag = false;
             }
@@ -83,38 +67,34 @@ public class Scraper {
         }
     }
 
-    public void createEvent(){
+    public void createEvent() throws SQLException {
+        System.out.println("Creating event...");
+
         String title = titleSelect();
         String description = buildDescription("/html/body/div[2]/section/div/div[1]/div/div/div[1]/div[4]/div[5]");
-        String priceString = driver.findElement(By.xpath("/html/body/div[2]/section/div/div[1]/div/div/div[2]/div/div[1]/div/div/div[3]/div/a/div[2]/div/div[2]/div[2]/span/span")).getText();
+
+        String imageUrl = driver.findElement(By.xpath("/html/body/div[2]/section/div/div[1]/div/div/div[1]/div[1]/img")).getAttribute("src");
+        WebElement eventInfo;
+
+        try{
+            eventInfo = driver.findElement(By.cssSelector("a.event-ticket.d-flex.mb-3.active"));
+        }catch (Exception e){
+            eventInfo = driver.findElement(By.cssSelector("a.event-ticket.d-flex.mb-3"));
+            eventInfo.click();
+        }
+
+        String place = eventInfo.findElement(By.className("ticket-location")).getText();
+        WebElement priceElement = eventInfo.findElement(By.className("price"));
+        String priceString = priceElement.findElement(By.className("text-nowrap")).getText();
         String[] splittedPriceString = priceString.split(" ");
         String priceReplaced = splittedPriceString[0].replace(',', '.');
         double price = Double.parseDouble(priceReplaced);
-        LocalDateTime dateAndTime = buildDateAndTime("/html/body/div[2]/section/div/div[1]/div/div/div[2]/div/div[1]/div/div/div[3]/div/a/div[1]/div/div[1]");
-        String place;
-        try{
-            place = driver.findElement(By.xpath("/html/body/div[2]/section/div/div[1]/div/div/div[1]/div[4]/div[1]/div[2]/div[3]/div[1]/div")).getText();
-        }catch (Exception e){
-            driver.findElement(By.xpath("/html/body/div[2]/section/div/div/div/div/div[2]/div/div[1]/div[2]/div/div[3]/div[1]/a")).click();
-            try{
-                place = driver.findElement(By.xpath("/html/body/div[2]/section/div/div[1]/div/div/div[1]/div[4]/div[1]/div[2]/div[3]/div[1]/div")).getText();
-            }catch (Exception ex){
-                place = driver.findElement(By.xpath("/html/body/div[2]/section/div/div[1]/div/div/div[1]/div[4]/div[1]/div[2]/div[3]/div[2]/div")).getText();
-            }
-        }
-        String imageUrl = driver.findElement(By.xpath("/html/body/div[2]/section/div/div[1]/div/div/div[1]/div[1]/img")).getAttribute("src");
 
-
+        LocalDateTime dateAndTime = buildDateAndTime(eventInfo.findElement(By.className("ticket-date-day")).getText());
         Event event = new Event(title, description, price, category, dateAndTime, place, imageUrl);
-        System.out.println("Event acquired.");
-    }
+        EventRepository.addEvent(event, 7, true);
+        System.out.println("Event created.");
 
-    public String placeSelect(){
-        try{
-            return driver.findElement(By.xpath("/html/body/div[2]/section/div/div[1]/div/div/div[1]/div[4]/div[1]/div[2]/div[3]/div[1]/div")).getText();
-        }catch (Exception e){
-            return driver.findElement(By.xpath("/html/body/div[2]/section/div/div/div/div/div[1]/div[4]/div[1]/div[2]/div/h1")).getText();
-        }
     }
 
     public String titleSelect(){
@@ -141,8 +121,8 @@ public class Scraper {
         return description;
     }
 
-    public LocalDateTime buildDateAndTime(String pathDate){
-        String[] dayAndMonth = driver.findElement(By.xpath(pathDate)).getText().split(" ");
+    public LocalDateTime buildDateAndTime(String text){
+        String[] dayAndMonth = text.split(" ");
         String month = convertMonthToNumberString(dayAndMonth[0]);
         String day = dayAndMonth[1];
         String year = "";
@@ -174,6 +154,9 @@ public class Scraper {
     }
 
     public void init() throws InterruptedException {
+
+        System.out.println("Strating...");
+
         ChromeOptions options = new ChromeOptions();
         //options.addArguments("--start-maximized");
         //options.addArguments("--headless=new");
@@ -198,8 +181,9 @@ public class Scraper {
         driver.manage().window().maximize();
         driver.manage().timeouts().implicitlyWait(2, TimeUnit.SECONDS);
 
+        System.out.println("Closing pup-ups...");
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
-        WebElement element = wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("/html/body/iframe[2]")));
+        WebElement element = wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("/html/body/iframe[3]")));
 
         driver.switchTo().frame(element);
         driver.findElement(By.className("ml-popup-close")).click();
@@ -209,7 +193,7 @@ public class Scraper {
 
         try {
             // Switch to the iframe
-            WebElement iframe3 = wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("/html/body/iframe[3]")));
+            WebElement iframe3 = wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("/html/body/iframe[2]")));
             driver.switchTo().frame(iframe3);
 
             // Wait for the popup to be clickable
@@ -227,6 +211,7 @@ public class Scraper {
             // Switch back to the main content
             driver.switchTo().defaultContent();
         }
+        System.out.println("Pop-ups closed.");
     }
 
     public void popUpHandle(){
