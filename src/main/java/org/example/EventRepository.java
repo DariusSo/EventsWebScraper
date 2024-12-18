@@ -11,9 +11,9 @@ public class EventRepository {
         pr.setString(1, event.getTitle());
         pr.setString(2, event.getDescription());
         pr.setDouble(3, event.getPrice());
-        pr.setString(4, event.getCategory());
+        pr.setString(4, event.getPlace());
         pr.setString(5, String.valueOf(event.getDateAndTime()));
-        pr.setString(6, event.getPlace());
+        pr.setString(6, event.getCategory());
         pr.setString(7, event.getImageUrl());
         pr.setInt(8, refund100);
         pr.setBoolean(9, refund24);

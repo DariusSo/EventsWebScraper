@@ -53,7 +53,6 @@ public class Scraper {
                 try{
                     createEvent();
                 }catch (Exception e){
-                    e.printStackTrace();
                     System.out.println("Tickets sold out or event canceled.");
                 }
                 driver.navigate().back();
@@ -92,6 +91,7 @@ public class Scraper {
 
         LocalDateTime dateAndTime = buildDateAndTime(eventInfo.findElement(By.className("ticket-date-day")).getText());
         Event event = new Event(title, description, price, category, dateAndTime, place, imageUrl);
+        System.out.println(category + "|" + place);
         EventRepository.addEvent(event, 7, true);
         System.out.println("Event created.");
 
@@ -126,7 +126,7 @@ public class Scraper {
         String month = convertMonthToNumberString(dayAndMonth[0]);
         String day = dayAndMonth[1];
         String year = "";
-        if(Integer.parseInt(month) < 12){
+        if(Integer.parseInt(month) <= 12){
             year = "2024";
         }else{
             year = "2025";
@@ -159,7 +159,7 @@ public class Scraper {
 
         ChromeOptions options = new ChromeOptions();
         //options.addArguments("--start-maximized");
-        //options.addArguments("--headless=new");
+        options.addArguments("--headless=new");
         options.addArguments("--disable-gpu"); // Reduces GPU overhead
         options.addArguments("--no-sandbox"); // Improves performance
         options.addArguments("--disable-dev-shm-usage"); // Uses disk instead of shared memory
